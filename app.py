@@ -1,25 +1,30 @@
 from flask import Flask, render_template, request, send_file, redirect, url_for
-# We need io to handle files in memory
 import io
 import os
 import pdfplumber
 from openpyxl import Workbook
 import re
 from docx import Document
-# Note: No 'secure_filename' or 'UPLOAD_FOLDER' needed anymore
+
+# --- NEW LINE 1 ---
+# This regex finds illegal XML characters (like those in your error log)
+# that cause openpyxl to crash. We will use it to clean the text.
+ILLEGAL_CHAR_RE = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uE000-\uF8FF]')
 
 app = Flask(__name__)
 
 def extract_info_from_pdf(pdf_stream):
     """Extracts info from a PDF file stream."""
-    # pdfplumber.open() can accept a file-like object (stream)
     with pdfplumber.open(pdf_stream) as pdf:
         text = ""
         for page in pdf.pages:
-            # Handle potential None from extract_text()
             page_text = page.extract_text()
             if page_text:
                 text += page_text
+
+    # --- NEW LINE 2 ---
+    # Clean the extracted text of any illegal characters before returning
+    text = ILLEGAL_CHAR_RE.sub('', text)
 
     email_regex = r'[\w\.-]+@[\w\.-]+'
     phone_regex = r'[\+\(]?[1-9][0-9 .\-\(\)]{8,}[0-9]'
@@ -31,9 +36,12 @@ def extract_info_from_pdf(pdf_stream):
 
 def extract_info_from_docx(docx_stream):
     """Extracts info from a DOCX file stream."""
-    # Document() can also accept a file-like object (stream)
     doc = Document(docx_stream)
     text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+
+    # --- NEW LINE 3 ---
+    # Also clean the text from DOCX files, just in case
+    text = ILLEGAL_CHAR_RE.sub('', text)
 
     email_regex = r'[\w\.-]+@[\w\.-]+'
     phone_regex = r'[\+\(]?[1-9][0-9 .\-\(\)]{8,}[0-9]'
@@ -56,9 +64,11 @@ def generate_excel_in_memory(data):
 
         if not text_lines:
             continue
-
+        
         # Append the first line of text with email and phone info
-        ws.append([filename, email_str, phone_str, text_lines[0]])
+        # Use .strip() to avoid empty lines from just having illegal chars
+        if text_lines[0].strip():
+             ws.append([filename, email_str, phone_str, text_lines[0]])
 
         # Append subsequent lines of text
         for line in text_lines[1:]:
@@ -76,13 +86,10 @@ def generate_excel_in_memory(data):
             except:
                 pass
         adjusted_width = (max_length + 2) * 1.2
-        # Ensure a minimum width just in case
         ws.column_dimensions[column_letter].width = max(10, adjusted_width)
 
-    # Create an in-memory stream
     memory_file = io.BytesIO()
     wb.save(memory_file)
-    # Rewind the stream to the beginning so send_file can read it
     memory_file.seek(0)
     
     print("Excel file generated in memory.")
@@ -91,7 +98,6 @@ def generate_excel_in_memory(data):
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        # Check if the post request has the file part
         if 'file' not in request.files:
             return render_template('index.html', error='No file part')
             
@@ -103,26 +109,26 @@ def upload_file():
         if file:
             filename = file.filename
             
-            # Process the file stream directly based on its extension
-            if filename.endswith('.pdf'):
-                emails, phones, text = extract_info_from_pdf(file.stream)
-            elif filename.endswith('.docx'):
-                emails, phones, text = extract_info_from_docx(file.stream)
-            else:
-                return render_template('index.html', error='Unsupported file format. Please upload .pdf or .docx')
+            try:
+                if filename.endswith('.pdf'):
+                    emails, phones, text = extract_info_from_pdf(file.stream)
+                elif filename.endswith('.docx'):
+                    emails, phones, text = extract_info_from_docx(file.stream)
+                else:
+                    return render_template('index.html', error='Unsupported file format. Please upload .pdf or .docx')
+                
+                memory_file = generate_excel_in_memory([(filename, emails, phones, text)])
+                
+                return send_file(
+                    memory_file,
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    download_name='cv_info.xlsx',
+                    as_attachment=True
+                )
+            except Exception as e:
+                # Log the error for debugging on Render
+                print(f"An error occurred: {e}")
+                return render_template('index.html', error='An error occurred while processing the file. It may be corrupted or in an unsupported format.')
             
-            # Generate the Excel file in memory
-            memory_file = generate_excel_in_memory([(filename, emails, phones, text)])
-            
-            # Return the in-memory file directly to the user for download
-            return send_file(
-                memory_file,
-                # Set the mimetype for .xlsx files
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                # Set the default download filename
-                download_name='cv_info.xlsx',
-                as_attachment=True
-            )
-            
-    # For GET requests
     return render_template('index.html')
+
