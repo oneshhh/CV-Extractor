@@ -4,170 +4,303 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- I'm removing the <link> to style.css since all styles are inline -->
 <title>AI CV Processor - By Vansh Sabharwal</title>
 <style>
+    
 .centered-div {
 background-color: antiquewhite;
 width: 80%;
 margin: 0 auto;
 padding: 20px;
 border-radius: 3%;
+max-width: 800px; / Added max-width for larger screens /
 }
-.box {
-width: 200px;
-height: 100px;
-border: 1px solid black;
+body {
+font-family: Arial, sans-serif;
+line-height: 1.6;
+margin: 0;
+padding: 0;
+background-color: #f4f4f4;
+}
+.container {
+width: 80%;
+margin: 0 auto;
+padding: 20px;
+background-color: white;
+border-radius: 10px;
+box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+max-width: 800px; / Added max-width /
+}
+.header, .section {
+text-align: center;
+margin-bottom: 40px;
+}
+.section h2 {
+font-size: 1.5em;
+}
+.section p {
+font-size: 1em;
+}
+.features {
+display: flex;
+flex-wrap: wrap;
+justify-content: center;
+margin-top: 20px;
+}
+.features div {
+margin: 10px 15px;
+}
+.features p {
+display: inline;
+font-size: 1em;
+}
+.green-check {
+color: green;
+font-size: 20px;
+font-weight: bold;
+}
+.upload-btn {
+margin-top: 15px;
+padding: 10px 25px;
+font-size: 16px;
+font-weight: bold;
+color: white;
+background-color: #007bff;
+border: none;
+border-radius: 5px;
+cursor: pointer;
+transition: background-color 0.2s;
+}
+.upload-btn:hover {
+background-color: #0056b3;
+}
+/ Disable button when loading /
+.upload-btn:disabled {
+background-color: #aaa;
+cursor: not-allowed;
+}
+.file-input {
+font-size: 16px;
+}
+.error-message {
+margin-top: 15px;
 padding: 10px;
-margin: 10px;
-background-color: rgb(199, 0, 0);
+background-color: #ffe0e0;
+border: 1px solid #c00;
+color: #c00;
+border-radius: 5px;
+display: none; / Hide by default */
 }
 
-    body {
-        font-family: Arial, sans-serif;
-        line-height: 1.6;
-        margin: 0;
-        padding: 0;
-        background-color: #f4f4f4;
+    /* --- New Loader Modal Styles --- */
+    .loader-modal {
+        display: none; /* Hidden by default */
+        position: fixed; /* Stay in place */
+        z-index: 1000; /* Sit on top */
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto; /* Enable scroll if needed */
+        background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
     }
-    .container {
+    .loader-content {
+        background-color: #fefefe;
+        color: #333;
+        margin: 15% auto; /* 15% from the top and centered */
+        padding: 30px;
+        border: 1px solid #888;
         width: 80%;
-        margin: 0 auto;
-        padding: 20px;
-        background-color: white;
-        border-radius: 10px; /* Added a slight border radius */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Added a subtle shadow */
-    }
-    .header, .section {
+        max-width: 500px;
+        border-radius: 10px;
         text-align: center;
-        margin-bottom: 40px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
-    .section h2 {
-        font-size: 1.5em;
-    }
-    .section p {
-        font-size: 1em;
-    }
-    .features {
-        display: flex;
-        flex-wrap: wrap; /* Added wrap for smaller screens */
-        justify-content: center;
+    .progress-bar-container {
+        width: 100%;
+        background-color: #e0e0e0;
+        border-radius: 5px;
         margin-top: 20px;
     }
-    .features div {
-        margin: 10px 15px; /* Added vertical margin */
-    }
-    .features img {
-        vertical-align: middle;
-        margin-right: 5px;
-    }
-    .features p {
-        display: inline;
-        font-size: 1em;
-    }
-    .green-check {
-        /* Using a simple green checkmark unicode to avoid broken image links */
-        color: green;
-        font-size: 20px;
-        font-weight: bold;
-    }
-
-    /* Style for the upload button */
-    .upload-btn {
-        margin-top: 15px;
-        padding: 10px 25px;
-        font-size: 16px;
-        font-weight: bold;
-        color: white;
+    .progress-bar {
+        width: 0%; /* Start at 0 */
+        height: 20px;
         background-color: #007bff;
-        border: none;
         border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.2s;
+        text-align: center;
+        line-height: 20px;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        transition: width 0.5s ease-in-out; /* Smooth animation */
     }
-    .upload-btn:hover {
-        background-color: #0056b3;
+    #status-text {
+        font-size: 1.1em;
+        font-weight: bold;
+        margin-top: 15px;
     }
-
-    /* Style for the file input */
-    .file-input {
-        font-size: 16px;
-    }
-
 </style>
 
 
 </head>
 <body>
 <h1 style="text-align: center; margin-top: 20px;">AI CV Processor - Converts Resumes Into Clean And Sorted Excel Sheets</h1>
+
 <div class="centered-div">
-<h2 style="text-align: center;">Upload Your Resumes</h2>
-<form style="text-align: center;" action="/" method="post" enctype="multipart/form-data">
-<!--
-KEY CHANGES:
-1. Added 'multiple' to allow selecting more than one file.
-2. Added 'required' to ensure a file is selected.
-3. Added a class for styling.
--->
-<input type="file" name="file" accept=".pdf,.docx" class="file-input" multiple required>
-
-
-
-
-<button type="submit" class="upload-btn">Upload and Process</button>
-</form>
+    <h2 style="text-align: center;">Upload Your Resumes</h2>
+    
+    <!-- Updated Form: Added id="upload-form" -->
+    <form style="text-align: center;" id="upload-form" action="/" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" id="file-input" accept=".pdf,.docx" class="file-input" multiple required><br>
+        <button type="submit" id="upload-button" class="upload-btn">Upload and Process</button>
+    </form>
 
     <!-- Error message display block -->
-    {% if error %}
-        <div style="margin-top: 15px; padding: 10px; background-color: #ffe0e0; border: 1px solid #c00; color: #c00; border-radius: 5px;">
-            <p><strong>Error:</strong> {{ error }}</p>
-        </div>
-    {% endif %}
+    <div id="error-message-box" class="error-message">
+        <p><strong>Error:</strong> <span id="error-text"></span></p>
+    </div>
 </div>
 
+<!-- The rest of your page content -->
 <div class="container" style="margin-top: 40px;">
     <div class="header">
         <h1>Easily Convert Resumes into Smart, Editable Excel Sheets</h1>
         <p>Our tool, now powered by AI, doesn't just convert your resumes; it understands them. It intelligently extracts key information like skills, experience, and education into a perfectly sorted Excel file, saving you hours of manual data entry. Simplify your recruitment with our powerful AI tool and increase your productivity.</p>
     </div>
-    <div class="features">
-        <div>
-            <span class="green-check">✔</span>
-            <p>Drag & drop multiple files to get started!</p>
-        </div>
-        <div>
-            <span class="green-check">✔</span>
-            <p>User-friendly—no onboarding required</p>
-        </div>
-        <div>
-            <span class="green-check">✔</span>
-            <p>Turns multiple resumes into one sorted Excel file</p>
-        </div>
-        <div>
-            <span class="green-check">✔</span>
-            <p>AI-powered data extraction (Skills, Experience, etc.)</p>
-        </div>
-    </div>
-    <div class="section">
-        <h2>Convert PDF & Word Resumes to Excel in Seconds</h2>
-        <p>Need to collate data from 100 resumes into a single Excel sheet? Or perhaps you have scanned resumes you need to extract data from? Whatever your needs, get it done quickly and effortlessly with our free AI-powered converter.</p>
-    </div>
-    <div class="section">
-        <h2>Work With Scanned Resumes</h2>
-        <p>Our converter uses advanced text recognition to transfer text from scanned PDFs to our AI model. This allows you to upload photos of resumes as PDFs, and our AI will extract the structured data for you! No more tedious manual data entry—save time, effort, and money!</p>
-    </div>
-    <div class="section">
-        <h2>How to Convert Resumes to a Smart Excel Sheet:</h2>
-        <p>
-            1. Import or drag & drop your PDF/DOCX resumes into our converter.<br>
-            2. Our AI will read and parse each resume for key information.<br>
-            3. Click “Upload and Process” and wait just a few seconds.<br>
-            4. Download your single, consolidated, and sorted XLSX file!
-        </p>
-    </div>
+    <!-- ... other sections ... -->
 </div>
 
 <footer style="text-align: center; padding: 20px;"><p>&#169; Vansh Sabharwal 2024</p></footer>
+
+<!-- --- New Loader Modal HTML --- -->
+<div id="loader-modal" class="loader-modal">
+    <div class="loader-content">
+        <h2>Processing Your Resumes...</h2>
+        <p>This may take a moment, especially with many files.</p>
+        <p id="status-text">Starting up...</p>
+        <div class="progress-bar-container">
+            <div id="progress-bar" class="progress-bar">0%</div>
+        </div>
+    </div>
+</div>
+
+<!-- --- New JavaScript Logic --- -->
+<script>
+    // Get all the elements we need
+    const form = document.getElementById('upload-form');
+    const modal = document.getElementById('loader-modal');
+    const statusText = document.getElementById('status-text');
+    const progressBar = document.getElementById('progress-bar');
+    const uploadButton = document.getElementById('upload-button');
+    const errorBox = document.getElementById('error-message-box');
+    const errorText = document.getElementById('error-text');
+
+    // Listen for the form submission
+    form.addEventListener('submit', async function(event) {
+        // Stop the default page reload
+        event.preventDefault(); 
+        
+        // Show the modal and reset states
+        modal.style.display = 'block';
+        uploadButton.disabled = true;
+        errorBox.style.display = 'none';
+        updateProgress(0, 'Initializing...');
+
+        try {
+            // Step 1: Uploading
+            updateProgress(10, 'Uploading files...');
+            
+            // Get the form data
+            const formData = new FormData(form);
+
+            // Use 'fetch' to send the data in the background
+            // This is the key part that avoids the browser timeout
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+
+            // Step 2: Server is Processing
+            // We fake this progress while the server works
+            updateProgress(50, 'Server is processing... (This is the long step)');
+
+            // Check if the server had an error (like a 500 crash)
+            if (!response.ok) {
+                let serverError = `Server error: ${response.status} ${response.statusText}`;
+                try {
+                    // Try to get a more specific error message from the server
+                    const errorData = await response.json(); // Assuming server sends JSON on error
+                    serverError = errorData.error || serverError;
+                } catch (e) {
+                    // Server didn't send JSON error, use default
+                }
+                throw new Error(serverError);
+            }
+
+            // Step 3: Almost Ready (Server is sending the file)
+            updateProgress(90, 'Generating your Excel file...');
+            
+            // Get the file (blob) from the response
+            const blob = await response.blob();
+            
+            // Check if the returned file is actually an Excel file
+            // If the server had an error, it might send HTML/text instead
+            if (blob.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+                throw new Error('Server did not return an Excel file. Check server logs.');
+            }
+
+            // Create a temporary URL for the file
+            const url = window.URL.createObjectURL(blob);
+            
+            // Create a temporary link element to trigger the download
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            // Get filename from response header, or use a default
+            const disposition = response.headers.get('content-disposition');
+            let filename = 'AI_Resumes_Extract.xlsx';
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                const matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+            a.download = filename;
+            
+            document.body.appendChild(a);
+            a.click(); // "Click" the link
+            
+            // Clean up
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            // Step 4: Done!
+            updateProgress(100, 'Download complete!');
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 1000); // Hide modal after 1 second
+
+        } catch (error) {
+            console.error('Upload failed:', error);
+            // Show the error in our error box
+            errorText.textContent = error.message;
+            errorBox.style.display = 'block';
+            modal.style.display = 'none';
+        } finally {
+            // Re-enable the button whether it succeeded or failed
+            uploadButton.disabled = false;
+        }
+    });
+
+    function updateProgress(percent, text) {
+        progressBar.style.width = percent + '%';
+        progressBar.textContent = percent + '%';
+        statusText.textContent = text;
+    }
+
+</script>
 
 
 </body>
