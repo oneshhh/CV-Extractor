@@ -15,7 +15,7 @@ ILLEGAL_CHAR_RE = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uE000-\uF8FF
 
 # --- AI Configuration ---
 # This is the (key-less) API endpoint we will use.
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key="
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=AIzaSyD8UiE99zIwqLlUur1gQboSLFj3dfBHnz8"
 
 # This is the JSON "template" we'll ask the AI to fill for each resume.
 RESUME_SCHEMA = {
