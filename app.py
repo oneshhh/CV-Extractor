@@ -10,12 +10,14 @@ import requests # To talk to the AI
 import json     # To handle the AI's JSON response
 import time     # For exponential backoff
 
+# --- Read API Key from Environment ---
+# This is the FIX for the 403 Error.
+# We will set this GOOGLE_API_KEY in the Render dashboard.
+API_KEY = os.environ.get('GOOGLE_API_KEY', '')
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={API_KEY}"
+
 # This regex finds illegal XML characters that crash openpyxl
 ILLEGAL_CHAR_RE = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uE000-\uF8FF]')
-
-# --- AI Configuration ---
-# This is the (key-less) API endpoint we will use.
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=AIzaSyD8UiE99zIwqLlUur1gQboSLFj3dfBHnz8"
 
 # This is the JSON "template" we'll ask the AI to fill for each resume.
 RESUME_SCHEMA = {
@@ -83,6 +85,11 @@ def get_structured_data_from_ai(resume_text):
     """
     Sends resume text to the Gemini API and asks for structured JSON output.
     """
+    if not API_KEY:
+        print("Error: GOOGLE_API_KEY environment variable is not set.")
+        # Return an error profile so the user sees the problem in the Excel
+        return {"name": "Error: Server API Key is not set.", "email": "", "phone": "", "summary": ""}
+
     system_prompt = (
         "You are an expert resume parser. Your job is to extract key information "
         "from a resume and return it in a structured JSON format. "
@@ -229,16 +236,18 @@ def upload_file():
                 filename = file.filename
                 print(f"Processing file: {filename}")
                 
+                # FIX 2: We changed 'except Exception' to 'except BaseException'.
+                # This will now catch the 'SystemExit' crash and prevent the
+                # whole server from dying, logging it as an error instead.
                 try:
                     if filename.endswith('.pdf'):
                         text = extract_text_from_pdf(file.stream)
                     elif filename.endswith('.docx'):
                         text = extract_text_from_docx(file.stream)
                     else:
-                        # This case should be rare but good to have
                         continue 
                     
-                    # This is the new AI step!
+                    # This is the AI step
                     profile_data = get_structured_data_from_ai(text)
                     
                     all_resume_data.append({
@@ -246,11 +255,11 @@ def upload_file():
                         "profile": profile_data
                     })
                     
-                except Exception as e:
-                    print(f"Error processing file {filename}: {e}")
+                except BaseException as e:
+                    print(f"CRITICAL ERROR processing file {filename}: {e}")
                     all_resume_data.append({
                         "filename": filename,
-                        "profile": {"name": f"Error processing file: {e}"}
+                        "profile": {"name": f"Error: Could not read file. It may be corrupt or too complex."}
                     })
             else:
                 # This catches any non-pdf/docx files if the browser check fails
@@ -265,7 +274,6 @@ def upload_file():
         return send_file(
             memory_file,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            # New filename for the AI-powered version
             download_name='AI_Resumes_Extract.xlsx',
             as_attachment=True
         )
