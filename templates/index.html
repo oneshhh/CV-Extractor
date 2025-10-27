@@ -4,184 +4,302 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Download Your File</title>
+<title>AI CV Processor - By Vansh Sabharwal</title>
 <style>
+/* --- Your Original Styles --- */
+.centered-div {
+background-color: antiquewhite;
+width: 80%;
+margin: 0 auto;
+padding: 20px;
+border-radius: 3%;
+max-width: 800px; /* Added max-width for larger screens */
+}
 body {
-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-background-color: #f4f4f4;
-display: flex;
-align-items: center;
-justify-content: center;
-min-height: 100vh;
+font-family: Arial, sans-serif;
+line-height: 1.6;
 margin: 0;
-text-align: center;
+padding: 0;
+background-color: #f4f4f4;
 }
 .container {
-background-color: #ffffff;
-padding: 2.5rem;
-border-radius: 0.5rem;
-box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-max-width: 480px;
-width: 90%;
+width: 80%;
+margin: 0 auto;
+padding: 20px;
+background-color: white;
+border-radius: 10px;
+box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+max-width: 800px; /* Added max-width */
 }
-.icon-wrapper {
-width: 5rem; /* 80px /
-height: 5rem; / 80px /
-background-color: #dcfce7; / bg-green-100 /
-border-radius: 9999px; / rounded-full /
+.header, .section {
+text-align: center;
+margin-bottom: 40px;
+}
+.section h2 {
+font-size: 1.5em;
+}
+.section p {
+font-size: 1em;
+}
+.features {
 display: flex;
-align-items: center;
+flex-wrap: wrap;
 justify-content: center;
-margin-left: auto;
-margin-right: auto;
+margin-top: 20px;
 }
-.icon-svg {
-width: 3rem; / 48px /
-height: 3rem; / 48px /
-/ This is the fix: color is set directly /
-color: #16a34a; / text-green-600 /
+.features div {
+margin: 10px 15px;
 }
-h1 {
-font-size: 1.875rem; / 30px /
-font-weight: 700;
-color: #1f2937; / text-gray-800 /
-margin-top: 1.5rem; / 24px /
+.features p {
+display: inline;
+font-size: 1em;
 }
-p {
-color: #4b5563; / text-gray-600 /
-font-size: 1.125rem; / 18px /
-margin-top: 0.75rem; / 12px /
+.green-check {
+color: green;
+font-size: 20px;
+font-weight: bold;
 }
-.text-small {
-font-size: 0.875rem; / 14px /
-color: #6b7280; / text-gray-500 /
-margin-top: 0.75rem; / 12px /
+.upload-btn {
+margin-top: 15px;
+padding: 10px 25px;
+font-size: 16px;
+font-weight: bold;
+color: white;
+background-color: #007bff;
+border: none;
+border-radius: 5px;
+cursor: pointer;
+transition: background-color 0.2s;
 }
-.text-error {
-color: #dc2626; / text-red-600 /
+.upload-btn:hover {
+background-color: #0056b3;
 }
-.download-button {
-display: inline-block;
-background-color: #2563eb; / bg-blue-600 /
-color: #ffffff;
-font-weight: 700;
-font-size: 1.125rem; / 18px /
-padding: 0.75rem 2.5rem; / py-3 px-10 /
-margin-top: 2rem; / 32px /
-border-radius: 0.5rem; / rounded-lg /
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-text-decoration: none;
-transition: background-color 0.2s ease-in-out;
+.upload-btn:disabled {
+background-color: #aaa;
+cursor: not-allowed;
 }
-.download-button:hover {
-background-color: #1d4ed8; / hover:bg-blue-700 /
+.file-input {
+font-size: 16px;
 }
-.back-link {
-display: block;
-margin-top: 1.5rem; / 24px /
-color: #2563eb; / text-blue-600 /
-text-decoration: none;
-transition: color 0.2s ease-in-out;
+.error-message {
+margin-top: 15px;
+padding: 10px;
+background-color: #ffe0e0;
+border: 1px solid #c00;
+color: #c00;
+border-radius: 5px;
+display: none; /* Hide by default */
 }
-.back-link:hover {
-color: #1d4ed8; / hover:text-blue-800 */
-}
+
+    /* --- New Loader Modal Styles --- */
+    .loader-modal {
+        display: none; /* Hidden by default */
+        position: fixed; /* Stay in place */
+        z-index: 1000; /* Sit on top */
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto; /* Enable scroll if needed */
+        background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+    }
+    .loader-content {
+        background-color: #fefefe;
+        color: #333;
+        margin: 15% auto; /* 15% from the top and centered */
+        padding: 30px;
+        border: 1px solid #888;
+        width: 80%;
+        max-width: 500px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    .progress-bar-container {
+        width: 100%;
+        background-color: #e0e0e0;
+        border-radius: 5px;
+        margin-top: 20px;
+    }
+    .progress-bar {
+        width: 0%; /* Start at 0 */
+        height: 20px;
+        background-color: #007bff;
+        border-radius: 5px;
+        text-align: center;
+        line-height: 20px;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+        transition: width 0.5s ease-in-out; /* Smooth animation */
+    }
+    #status-text {
+        font-size: 1.1em;
+        font-weight: bold;
+        margin-top: 15px;
+    }
 </style>
+
+
 </head>
 <body>
+<h1 style="text-align: center; margin-top: 20px;">AI CV Processor - Converts Resumes Into Clean And Sorted Excel Sheets</h1>
 
-<div class="container">
+<div class="centered-div">
+    <h2 style="text-align: center;">Upload Your Resumes</h2>
     
-    <!-- Success Icon (Green Checkmark) -->
-    <div class="icon-wrapper">
-        <svg class="icon-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-        </svg>
-    </div>
+    <!-- Updated Form: Added id="upload-form" -->
+    <form style="text-align: center;" id="upload-form" action="/" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" id="file-input" accept=".pdf,.docx" class="file-input" multiple required><br>
+        <button type="submit" id="upload-button" class="upload-btn">Upload and Process</button>
+    </form>
 
-    <!-- Main Content -->
-    <h1 id="message-title">Conversion Successful!</h1>
-    <p id="message-body">
-        Your file has been processed and your download should begin automatically.
-    </p>
-    <p class="text-small">
-        If your download doesn't start, click the button below.
-    </p>
-
-    <!-- Download Button -->
-    <div>
-        <a id="download-link"
-           href="#" 
-           download="AI_Resumes_Extract.xlsx"
-           class="download-button">
-            Download File
-        </a>
-    </div>
-
-    <!-- Go Back Link -->
-    <div>
-        <a href="/" class="back-link">
-            &larr; Convert More Files
-        </a>
+    <!-- Error message display block -->
+    <div id="error-message-box" class="error-message">
+        <p><strong>Error:</strong> <span id="error-text"></span></p>
     </div>
 </div>
 
+<!-- The rest of your page content -->
+<div class="container" style="margin-top: 40px;">
+    <div class="header">
+        <h1>Easily Convert Resumes into Smart, Editable Excel Sheets</h1>
+        <p>Our tool, now powered by AI, doesn't just convert your resumes; it understands them. It intelligently extracts key information like skills, experience, and education into a perfectly sorted Excel file, saving you hours of manual data entry. Simplify your recruitment with our powerful AI tool and increase your productivity.</p>
+    </div>
+    <!-- ... other sections ... -->
+</div>
+
+<footer style="text-align: center; padding: 20px;"><p>&#169; Vansh Sabharwal 2024</p></footer>
+
+<!-- --- New Loader Modal HTML --- -->
+<div id="loader-modal" class="loader-modal">
+    <div class="loader-content">
+        <h2>Processing Your Resumes...</h2>
+        <p>This may take a moment, especially with many files.</p>
+        <p id="status-text">Starting up...</p>
+        <div class="progress-bar-container">
+            <div id="progress-bar" class="progress-bar">0%</div>
+        </div>
+    </div>
+</div>
+
+<!-- --- New JavaScript Logic --- -->
 <script>
-    // --- Helper function to convert Base64 back to Blob ---
-    function base64ToBlob(base64, contentType = '') {
-        const sliceSize = 512;
-        const byteCharacters = atob(base64);
-        const byteArrays = [];
+    // Get all the elements we need
+    const form = document.getElementById('upload-form');
+    const modal = document.getElementById('loader-modal');
+    const statusText = document.getElementById('status-text');
+    const progressBar = document.getElementById('progress-bar');
+    const uploadButton = document.getElementById('upload-button');
+    const errorBox = document.getElementById('error-message-box');
+    const errorText = document.getElementById('error-text');
 
-        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-            const slice = byteCharacters.slice(offset, offset + sliceSize);
-            const byteNumbers = new Array(slice.length);
-            for (let i = 0; i < slice.length; i++) {
-                byteNumbers[i] = slice.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            byteArrays.push(byteArray);
-        }
-
-        return new Blob(byteArrays, { type: contentType });
+    // --- Helper function to convert Blob to Base64 ---
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]); // Get just the data part
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
     }
 
-    // This script will run as soon as the page loads
-    window.onload = function() {
-        const downloadLink = document.getElementById('download-link');
-        const title = document.getElementById('message-title');
-        const body = document.getElementById('message-body');
+    // Listen for the form submission
+    form.addEventListener('submit', async function(event) {
+        // Stop the default page reload
+        event.preventDefault(); 
+        
+        // Show the modal and reset states
+        modal.style.display = 'block';
+        uploadButton.disabled = true;
+        errorBox.style.display = 'none';
+        updateProgress(0, 'Initializing...');
 
-        // Get the file data from sessionStorage
-        const base64Data = sessionStorage.getItem('excelData');
-
-        if (base64Data) {
-            // IMPORTANT: Remove the item immediately
-            // This makes the download link one-time use
-            sessionStorage.removeItem('excelData');
-
-            // Convert the Base64 data back into a file Blob
-            const excelBlob = base64ToBlob(base64Data, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        try {
+            // Step 1: Uploading
+            updateProgress(10, 'Uploading files...');
             
-            // Create a temporary URL for the Blob
-            const blobUrl = window.URL.createObjectURL(excelBlob);
-            
-            // Set the button's href to be the download link
-            downloadLink.href = blobUrl;
+            // Get the form data
+            const formData = new FormData(form);
 
-            // --- This is the "auto-download" part ---
-            // We programmatically "click" the download link
-            // This *should* work since it follows a user action (the upload)
-            downloadLink.click();
+            // Use 'fetch' to send the data in the background
+            const response = await fetch('/', {
+                method: 'POST',
+                body: formData
+            });
+
+            // Step 2: Server is Processing
+            updateProgress(50, 'Server is processing... (This is the long step)');
+
+            // Check if the server had an error
+            if (!response.ok) {
+                let serverError = `Server error: ${response.status} ${response.statusText}`;
+                try {
+                    // Try to get a JSON error message, as setup in app.py
+                    const errorData = await response.json(); 
+                    serverError = errorData.error || serverError;
+                } catch (e) {
+                    // Server didn't send JSON, maybe a 502/504 gateway error
+                }
+                throw new Error(serverError);
+            }
+
+            // --- *** NEW LOGIC V2 *** ---
+            // Step 3: Server sent back the file as a Blob
+            updateProgress(90, 'File generated! Saving locally...');
             
-        } else {
-            // This happens if someone visits /results directly or refreshes the page
-            title.textContent = 'Error: File Not Found';
-            body.textContent = 'This download link is invalid or has expired. The file is available for one-time download only.';
-            body.classList.add('text-error');
-            downloadLink.style.display = 'none'; // Hide the download button
+            // We are now expecting a file/blob, not JSON
+            const blob = await response.blob();
+
+            // Check if the returned file is actually an Excel file
+            if (blob.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+                // It's not an excel file, it's probably a JSON error that slipped through
+                let errorMsg = 'Server did not return an Excel file.';
+                try {
+                    const errText = await blob.text();
+                    const errJson = JSON.parse(errText);
+                    if (errJson.error) {
+                        errorMsg = errJson.error;
+                    }
+                } catch(e) {}
+                throw new Error(errorMsg);
+            }
+
+            // Convert the file blob to a Base64 string to store it
+            const base64Data = await blobToBase64(blob);
+
+            // Store the file data in sessionStorage
+            // This is temporary storage that lasts for the browser tab session
+            sessionStorage.setItem('excelData', base64Data);
+
+            // Step 4: Success! Redirect to the results page
+            updateProgress(100, 'Success! Redirecting...');
+            
+            // We add a short delay so the user can read "Success!"
+            setTimeout(() => {
+                window.location.href = `/results`; // No file_id needed!
+            }, 500); // 0.5 second delay
+            
+            // --- *** END OF NEW LOGIC V2 *** ---
+
+        } catch (error) {
+            console.error('Upload failed:', error);
+            // Show the error in our error box
+            errorText.textContent = error.message;
+            errorBox.style.display = 'block';
+            modal.style.display = 'none';
+        } finally {
+            // Re-enable the button
+            uploadButton.disabled = false;
         }
-    };
+    });
+
+    function updateProgress(percent, text) {
+        progressBar.style.width = percent + '%';
+        progressBar.textContent = percent + '%';
+        statusText.textContent = text;
+    }
+
 </script>
 
 
