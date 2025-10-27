@@ -9,6 +9,7 @@ from docx import Document
 import requests # To talk to the AI
 import json     # To handle the AI's JSON response
 import time     # For exponential backoff
+import uuid     # To generate unique file IDs
 
 # --- Read API Key from Environment ---
 # This looks for the 'GOOGLE_API_KEY' you set in the Render dashboard.
@@ -57,6 +58,12 @@ RESUME_SCHEMA = {
 
 
 app = Flask(__name__)
+
+# --- In-memory cache for generated files ---
+# This will store files temporarily.
+# A more robust solution for scaling would use a database or cloud storage.
+file_cache = {}
+
 
 def clean_text(text):
     """Cleans text of illegal characters for XML."""
@@ -265,13 +272,52 @@ def upload_file():
 
         memory_file = generate_excel_in_memory(all_resume_data)
         
-        return send_file(
-            memory_file,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            download_name='AI_Resumes_Extract.xlsx',
-            as_attachment=True
-        )
+        # --- NEW LOGIC ---
+        # Instead of sending the file, store it in the cache
+        # and send back a JSON response with a unique ID.
+        
+        # Generate a unique ID for this file
+        download_id = str(uuid.uuid4())
+        
+        # Store the file in our in-memory cache
+        # We'll also store the filename for the download
+        file_cache[download_id] = {
+            "file": memory_file,
+            "filename": "AI_Resumes_Extract.xlsx"
+        }
+        
+        # Send back a JSON response with the download ID
+        return jsonify({"success": True, "download_id": download_id})
             
     # For GET requests, just show the HTML page
     return render_template('index.html')
+
+@app.route('/results')
+def results_page():
+    """
+    Renders the download/success page.
+    The file_id is passed as a URL query parameter (?file_id=...)
+    """
+    return render_template('results.html')
+
+@app.route('/download/<download_id>')
+def download_file(download_id):
+    """
+    Serves the generated file from the in-memory cache.
+    """
+    # Use .pop() to get the file AND remove it from the cache.
+    # This ensures the link is one-time use and cleans up memory.
+    file_data = file_cache.pop(download_id, None) 
+    
+    if file_data:
+        return send_file(
+            file_data["file"],
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            download_name=file_data["filename"],
+            as_attachment=True
+        )
+    else:
+        # If file is not found (e.g., expired, bad link), redirect to home
+        # You could also show an error page.
+        return redirect(url_for('upload_file'))
 

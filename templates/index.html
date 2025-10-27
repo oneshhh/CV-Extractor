@@ -214,22 +214,19 @@ display: none; /* Hide by default */
             const formData = new FormData(form);
 
             // Use 'fetch' to send the data in the background
-            // This is the key part that avoids the browser timeout
             const response = await fetch('/', {
                 method: 'POST',
                 body: formData
             });
 
             // Step 2: Server is Processing
-            // We fake this progress while the server works
             updateProgress(50, 'Server is processing... (This is the long step)');
 
-            // Check if the server had an error (like a 500 crash)
+            // Check if the server had an error
             if (!response.ok) {
                 let serverError = `Server error: ${response.status} ${response.statusText}`;
                 try {
-                    // Try to get a more specific error message from the server
-                    const errorData = await response.json(); // Assuming server sends JSON on error
+                    const errorData = await response.json(); 
                     serverError = errorData.error || serverError;
                 } catch (e) {
                     // Server didn't send JSON error, use default
@@ -237,59 +234,30 @@ display: none; /* Hide by default */
                 throw new Error(serverError);
             }
 
-            // Step 3: Almost Ready (Server is sending the file)
-            updateProgress(90, 'Generating your Excel file...');
+            // --- *** NEW LOGIC *** ---
+            // Step 3: Server sent back a JSON response
+            updateProgress(90, 'Finalizing... Awaiting redirect link...');
             
-            // Get the file (blob) from the response
-            const blob = await response.blob();
-            
-            // Check if the returned file is actually an Excel file
-            // If the server had an error, it might send HTML/text instead
-            if (blob.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-                // Try to read the blob as text to get the error message
-                let errorMsg = 'Server did not return an Excel file. Check server logs.';
-                try {
-                    const errText = await blob.text();
-                    const errJson = JSON.parse(errText);
-                    if (errJson.error) {
-                        errorMsg = errJson.error;
-                    }
-                } catch(e) {}
-                throw new Error(errorMsg);
+            // We are no longer expecting a file/blob, but a JSON response
+            const data = await response.json();
+
+            if (data.error) {
+                // This is a business logic error (e.g., "No files processed")
+                throw new Error(data.error);
             }
 
-            // Create a temporary URL for the file
-            const url = window.URL.createObjectURL(blob);
-            
-            // Create a temporary link element to trigger the download
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            // Get filename from response header, or use a default
-            const disposition = response.headers.get('content-disposition');
-            let filename = 'AI_Resumes_Extract.xlsx';
-            if (disposition && disposition.indexOf('attachment') !== -1) {
-                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-                const matches = filenameRegex.exec(disposition);
-                if (matches != null && matches[1]) {
-                    filename = matches[1].replace(/['"]/g, '');
-                }
+            if (data.success && data.download_id) {
+                // Step 4: Success! Redirect to the results page
+                updateProgress(100, 'Success! Redirecting...');
+                
+                // We add a short delay so the user can read "Success!"
+                setTimeout(() => {
+                    window.location.href = `/results?file_id=${data.download_id}`;
+                }, 500); // 0.5 second delay
+            } else {
+                throw new Error('Server returned an invalid response. Please try again.');
             }
-            a.download = filename;
-            
-            document.body.appendChild(a);
-            a.click(); // "Click" the link
-            
-            // Clean up
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            // Step 4: Done!
-            updateProgress(100, 'Download complete!');
-            
-            setTimeout(() => {
-                modal.style.display = 'none';
-            }, 1000); // Hide modal after 1 second
+            // --- *** END OF NEW LOGIC *** ---
 
         } catch (error) {
             console.error('Upload failed:', error);
@@ -299,6 +267,7 @@ display: none; /* Hide by default */
             modal.style.display = 'none';
         } finally {
             // Re-enable the button whether it succeeded or failed
+            // This is less critical now, as we are redirecting on success
             uploadButton.disabled = false;
         }
     });

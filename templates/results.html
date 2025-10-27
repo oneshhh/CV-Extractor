@@ -1,12 +1,89 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Results</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Download Your File</title>
+<!-- We'll use Tailwind CSS for modern styling -->
+<script src="https://www.google.com/search?q=https://cdn.tailwindcss.com"></script>
+<style>
+/* A simple fallback for the font */
+body {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+</style>
 </head>
-<body style="text-align: center;">
-    <h1>Results</h1>
-    <p>the CV has been converted succesfully into Excel.</p>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+<div class="bg-white p-8 md:p-12 rounded-lg shadow-xl max-w-lg w-full text-center">
+    
+    <!-- Success Icon (Green Checkmark) -->
+    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+        <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+    </div>
+
+    <!-- Main Content -->
+    <h1 id="message-title" class="text-3xl font-bold text-gray-800 mt-6">Conversion Successful!</h1>
+    <p id="message-body" class="text-gray-600 text-lg mt-3">
+        Your file has been processed and your download should begin automatically.
+    </p>
+    <p class="text-gray-500 text-sm mt-3">
+        If your download doesn't start, click the button below.
+    </p>
+
+    <!-- Download Button -->
+    <div class="mt-8">
+        <a id="download-link"
+           href="#" 
+           class="inline-block bg-blue-600 text-white font-bold text-lg py-3 px-10 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200">
+            Download File
+        </a>
+    </div>
+
+    <!-- Go Back Link -->
+    <div class="mt-6">
+        <a href="/" class="text-blue-600 hover:text-blue-800 transition-colors">
+            &larr; Convert More Files
+        </a>
+    </div>
+</div>
+
+<script>
+    // This script will run as soon as the page loads
+    window.onload = function() {
+        // Get the 'file_id' from the URL (e.g., ?file_id=abc-123)
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileId = urlParams.get('file_id');
+
+        const downloadLink = document.getElementById('download-link');
+        const title = document.getElementById('message-title');
+        const body = document.getElementById('message-body');
+
+        if (fileId) {
+            // Construct the download URL
+            const downloadUrl = `/download/${fileId}`;
+            
+            // Set the button's href to be the download link
+            downloadLink.href = downloadUrl;
+
+            // --- This is the "auto-download" part ---
+            // We programmatically "click" the download link
+            // This will trigger the browser's download prompt
+            downloadLink.click();
+            
+        } else {
+            // This happens if someone visits /results directly
+            title.textContent = 'Error: File Not Found';
+            body.textContent = 'This download link is invalid or has expired. Please go back and try converting your files again.';
+            body.classList.add('text-red-600');
+            downloadLink.style.display = 'none'; // Hide the download button
+        }
+    };
+</script>
+
+
 </body>
 </html>
