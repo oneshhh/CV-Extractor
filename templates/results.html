@@ -5,80 +5,180 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Download Your File</title>
-<!-- We'll use Tailwind CSS for modern styling -->
-<script src="https://www.google.com/search?q=https://cdn.tailwindcss.com"></script>
 <style>
-/* A simple fallback for the font */
 body {
 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+background-color: #f4f4f4;
+display: flex;
+align-items: center;
+justify-content: center;
+min-height: 100vh;
+margin: 0;
+text-align: center;
+}
+.container {
+background-color: #ffffff;
+padding: 2.5rem;
+border-radius: 0.5rem;
+box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+max-width: 480px;
+width: 90%;
+}
+.icon-wrapper {
+width: 5rem; /* 80px /
+height: 5rem; / 80px /
+background-color: #dcfce7; / bg-green-100 /
+border-radius: 9999px; / rounded-full /
+display: flex;
+align-items: center;
+justify-content: center;
+margin-left: auto;
+margin-right: auto;
+}
+.icon-svg {
+width: 3rem; / 48px /
+height: 3rem; / 48px /
+/ This is the fix: color is set directly /
+color: #16a34a; / text-green-600 /
+}
+h1 {
+font-size: 1.875rem; / 30px /
+font-weight: 700;
+color: #1f2937; / text-gray-800 /
+margin-top: 1.5rem; / 24px /
+}
+p {
+color: #4b5563; / text-gray-600 /
+font-size: 1.125rem; / 18px /
+margin-top: 0.75rem; / 12px /
+}
+.text-small {
+font-size: 0.875rem; / 14px /
+color: #6b7280; / text-gray-500 /
+margin-top: 0.75rem; / 12px /
+}
+.text-error {
+color: #dc2626; / text-red-600 /
+}
+.download-button {
+display: inline-block;
+background-color: #2563eb; / bg-blue-600 /
+color: #ffffff;
+font-weight: 700;
+font-size: 1.125rem; / 18px /
+padding: 0.75rem 2.5rem; / py-3 px-10 /
+margin-top: 2rem; / 32px /
+border-radius: 0.5rem; / rounded-lg /
+box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+text-decoration: none;
+transition: background-color 0.2s ease-in-out;
+}
+.download-button:hover {
+background-color: #1d4ed8; / hover:bg-blue-700 /
+}
+.back-link {
+display: block;
+margin-top: 1.5rem; / 24px /
+color: #2563eb; / text-blue-600 /
+text-decoration: none;
+transition: color 0.2s ease-in-out;
+}
+.back-link:hover {
+color: #1d4ed8; / hover:text-blue-800 */
 }
 </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body>
 
-<div class="bg-white p-8 md:p-12 rounded-lg shadow-xl max-w-lg w-full text-center">
+<div class="container">
     
     <!-- Success Icon (Green Checkmark) -->
-    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-        <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <div class="icon-wrapper">
+        <svg class="icon-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
         </svg>
     </div>
 
     <!-- Main Content -->
-    <h1 id="message-title" class="text-3xl font-bold text-gray-800 mt-6">Conversion Successful!</h1>
-    <p id="message-body" class="text-gray-600 text-lg mt-3">
+    <h1 id="message-title">Conversion Successful!</h1>
+    <p id="message-body">
         Your file has been processed and your download should begin automatically.
     </p>
-    <p class="text-gray-500 text-sm mt-3">
+    <p class="text-small">
         If your download doesn't start, click the button below.
     </p>
 
     <!-- Download Button -->
-    <div class="mt-8">
+    <div>
         <a id="download-link"
            href="#" 
-           class="inline-block bg-blue-600 text-white font-bold text-lg py-3 px-10 rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200">
+           download="AI_Resumes_Extract.xlsx"
+           class="download-button">
             Download File
         </a>
     </div>
 
     <!-- Go Back Link -->
-    <div class="mt-6">
-        <a href="/" class="text-blue-600 hover:text-blue-800 transition-colors">
+    <div>
+        <a href="/" class="back-link">
             &larr; Convert More Files
         </a>
     </div>
 </div>
 
 <script>
+    // --- Helper function to convert Base64 back to Blob ---
+    function base64ToBlob(base64, contentType = '') {
+        const sliceSize = 512;
+        const byteCharacters = atob(base64);
+        const byteArrays = [];
+
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+            const slice = byteCharacters.slice(offset, offset + sliceSize);
+            const byteNumbers = new Array(slice.length);
+            for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            byteArrays.push(byteArray);
+        }
+
+        return new Blob(byteArrays, { type: contentType });
+    }
+
     // This script will run as soon as the page loads
     window.onload = function() {
-        // Get the 'file_id' from the URL (e.g., ?file_id=abc-123)
-        const urlParams = new URLSearchParams(window.location.search);
-        const fileId = urlParams.get('file_id');
-
         const downloadLink = document.getElementById('download-link');
         const title = document.getElementById('message-title');
         const body = document.getElementById('message-body');
 
-        if (fileId) {
-            // Construct the download URL
-            const downloadUrl = `/download/${fileId}`;
+        // Get the file data from sessionStorage
+        const base64Data = sessionStorage.getItem('excelData');
+
+        if (base64Data) {
+            // IMPORTANT: Remove the item immediately
+            // This makes the download link one-time use
+            sessionStorage.removeItem('excelData');
+
+            // Convert the Base64 data back into a file Blob
+            const excelBlob = base64ToBlob(base64Data, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            
+            // Create a temporary URL for the Blob
+            const blobUrl = window.URL.createObjectURL(excelBlob);
             
             // Set the button's href to be the download link
-            downloadLink.href = downloadUrl;
+            downloadLink.href = blobUrl;
 
             // --- This is the "auto-download" part ---
             // We programmatically "click" the download link
-            // This will trigger the browser's download prompt
+            // This *should* work since it follows a user action (the upload)
             downloadLink.click();
             
         } else {
-            // This happens if someone visits /results directly
+            // This happens if someone visits /results directly or refreshes the page
             title.textContent = 'Error: File Not Found';
-            body.textContent = 'This download link is invalid or has expired. Please go back and try converting your files again.';
-            body.classList.add('text-red-600');
+            body.textContent = 'This download link is invalid or has expired. The file is available for one-time download only.';
+            body.classList.add('text-error');
             downloadLink.style.display = 'none'; // Hide the download button
         }
     };

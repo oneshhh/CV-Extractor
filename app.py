@@ -9,285 +9,263 @@ from docx import Document
 import requests # To talk to the AI
 import json     # To handle the AI's JSON response
 import time     # For exponential backoff
-import uuid     # To generate unique file IDs
+# We no longer need uuid or a file_cache
+# import uuid  <- REMOVED
 
 # --- Read API Key from Environment ---
-# This looks for the 'GOOGLE_API_KEY' you set in the Render dashboard.
 API_KEY = os.environ.get('GOOGLE_API_KEY', '')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={API_KEY}"
 
 # This regex finds illegal XML characters that crash openpyxl
+# We must re-create this properly
 ILLEGAL_CHAR_RE = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uE000-\uF8FF]')
 
 # This is the JSON "template" we'll ask the AI to fill for each resume.
 RESUME_SCHEMA = {
     "type": "OBJECT",
     "properties": {
-        "name": {"type": "STRING"},
-        "email": {"type": "STRING"},
-        "phone": {"type": "STRING"},
-        "summary": {"type": "STRING"},
+        "name": { "type": "STRING" },
+        "email": { "type": "STRING" },
+        "phone": { "type": "STRING" },
+        "summary": { "type": "STRING", "description": "A 2-3 sentence summary of the candidate." },
+        "skills": { 
+            "type": "ARRAY", 
+            "items": { "type": "STRING" },
+            "description": "A list of key skills and technologies."
+        },
         "experience": {
             "type": "ARRAY",
             "items": {
                 "type": "OBJECT",
                 "properties": {
-                    "title": {"type": "STRING"},
-                    "company": {"type": "STRING"},
-                    "duration": {"type": "STRING"},
+                    "title": { "type": "STRING" },
+                    "company": { "type": "STRING" },
+                    "duration": { "type": "STRING", "description": "e.g., 'Jan 2020 - Present' or '3 years'" }
                 }
-            }
+            },
+            "description": "A list of relevant work experiences."
         },
         "education": {
             "type": "ARRAY",
             "items": {
                 "type": "OBJECT",
                 "properties": {
-                    "degree": {"type": "STRING"},
-                    "institution": {"type": "STRING"},
-                    "year": {"type": "STRING"},
+                    "degree": { "type": "STRING" },
+                    "institution": { "type": "STRING" }
                 }
-            }
-        },
-        "skills": {
-            "type": "ARRAY",
-            "items": {"type": "STRING"}
+            },
+            "description": "A list of educational qualifications."
         }
     }
 }
 
 
 app = Flask(__name__)
-
-# --- In-memory cache for generated files ---
-# This will store files temporarily.
-# A more robust solution for scaling would use a database or cloud storage.
-file_cache = {}
+# file_cache = {} <- REMOVED, no longer needed
 
 
 def clean_text(text):
-    """Cleans text of illegal characters for XML."""
-    if not text:
+    """
+    Removes illegal XML characters from a string.
+    """
+    if not isinstance(text, str):
         return ""
     return ILLEGAL_CHAR_RE.sub('', text)
 
 def extract_text_from_pdf(pdf_stream):
-    """Extracts text from a PDF file stream."""
+    """
+    Extracts text from a PDF file stream and cleans it.
+    """
     text = ""
-    with pdfplumber.open(pdf_stream) as pdf:
-        for page in pdf.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text
+    try:
+        with pdfplumber.open(pdf_stream) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+    except Exception as e:
+        print(f"Error reading PDF: {e}")
+        return "" # Return empty string on failure
     return clean_text(text)
 
 def extract_text_from_docx(docx_stream):
-    """Extracts text from a DOCX file stream."""
-    doc = Document(docx_stream)
-    text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+    """
+    Extracts text from a DOCX file stream and cleans it.
+    """
+    text = ""
+    try:
+        doc = Document(docx_stream)
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+    except Exception as e:
+        print(f"Error reading DOCX: {e}")
+        return "" # Return empty string on failure
     return clean_text(text)
 
 def get_structured_data_from_ai(resume_text):
     """
-    Sends resume text to the Gemini API and asks for structured JSON output.
+    Sends resume text to the Gemini API and asks for structured JSON data.
     """
-    if not API_KEY:
-        print("Error: GOOGLE_API_KEY environment variable is not set.")
-        # Return an error profile so the user sees the problem in the Excel
-        return {"name": "Error: Server API Key is not set.", "email": "", "phone": "", "summary": ""}
-
-    system_prompt = (
-        "You are an expert resume parser. Your job is to extract key information "
-        "from a resume and return it in a structured JSON format. "
-        "Do not return any text outside of the JSON object. "
-        "If information is not found, return an empty string or empty array."
-    )
-    user_prompt = f"Please extract the information from this resume:\n\n{resume_text}"
+    if not resume_text or not API_KEY:
+        print("Skipping AI call: No text or no API key.")
+        return {"name": "Error: No text or API key", "email": "", "phone": "", "summary": ""}
 
     payload = {
-        "contents": [{"parts": [{"text": user_prompt}]}],
-        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{
+            "parts": [{ "text": f"Extract the relevant information from this resume text:\n\n{resume_text}" }]
+        }],
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseSchema": RESUME_SCHEMA
         }
     }
-
+    
     retries = 3
-    delay = 1
     for i in range(retries):
         try:
-            # Added a timeout to the request for robustness
-            response = requests.post(GEMINI_API_URL, json=payload, timeout=45)
-            response.raise_for_status() # Raise an error for bad responses (4xx, 5xx)
+            response = requests.post(GEMINI_API_URL, json=payload, headers={'Content-Type': 'application/json'})
             
-            result = response.json()
-            
-            if 'candidates' in result and result['candidates'][0].get('content', {}).get('parts', [{}])[0].get('text'):
-                json_text = result['candidates'][0]['content']['parts'][0]['text']
-                # The response is a JSON string, so we parse it into a Python dict
+            if response.status_code == 200:
+                response_json = response.json()
+                json_text = response_json.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '{}')
                 return json.loads(json_text)
             else:
-                print(f"AI response was valid but empty or malformed. Response: {result}")
-                
+                print(f"Error calling Gemini API: {response.status_code} {response.text}. Retrying in {i+1}s...")
+                time.sleep(i + 1)
+        
         except requests.exceptions.RequestException as e:
-            print(f"Error calling Gemini API: {e}. Retrying in {delay}s...")
+            print(f"Network error calling Gemini API: {e}. Retrying in {i+1}s...")
+            time.sleep(i + 1)
+        except json.JSONDecodeError as e:
+            print(f"Error decoding Gemini response: {e}. Response was: {json_text}")
+            return {"name": "Error: Could not parse AI response", "email": "", "phone": "", "summary": ""}
         except Exception as e:
-            # Catch other errors like JSON parsing
-            print(f"Error processing AI response: {e}. Response text: {response.text if 'response' in locals() else 'No response'}")
+            print(f"Unknown error in get_structured_data_from_ai: {e}")
+            return {"name": "Error: Unknown AI processing error", "email": "", "phone": "", "summary": ""}
 
-        time.sleep(delay)
-        delay *= 2 # Exponential backoff
-    
-    # If all retries fail, return a default object
-    return {"name": "Error: Could not parse resume", "email": "", "phone": "", "summary": f"Failed to process resume text: {resume_text[:100]}..."}
+    print("Gemini API call failed after all retries.")
+    return {"name": "Error: AI API call failed", "email": "", "phone": "", "summary": f"Failed to process resume text: {resume_text[:100]}..."}
 
 
 def generate_excel_in_memory(all_resume_data):
     """
-    Generates an Excel file in memory from the list of structured resume data.
+    Generates an Excel file in memory from the structured resume data.
     """
     wb = Workbook()
     ws = wb.active
     
-    # Define headers - these match your new requirements
-    headers = [
-        "File", "Name", "Email", "Phone", "Skills", 
-        "Recent Experience", "All Experience", "Education", "Summary"
-    ]
+    # Define headers from our schema
+    headers = ["Filename", "Name", "Email", "Phone", "Summary", "Skills", "Recent Experience", "Education"]
     ws.append(headers)
     
-    # Make header bold
-    for cell in ws[1]:
+    # Apply bold font to headers
+    for cell in ws["1:1"]:
         cell.font = Font(bold=True)
 
-    # Populate data
+    # Add data rows
     for data in all_resume_data:
-        filename = data.get('filename', 'N/A')
-        profile = data.get('profile', {})
-
-        # Flatten skills list into a string
-        skills_str = ", ".join(profile.get('skills', []))
+        if not data:
+            continue
+            
+        # Extract skills (list to string)
+        skills = ", ".join(data.get('skills', []))
         
-        # Flatten experience list
-        exp_list = []
-        for exp in profile.get('experience', []):
-            exp_list.append(
-                f"{exp.get('title', 'N/A')} at {exp.get('company', 'N/A')} ({exp.get('duration', 'N/A')})"
-            )
-        exp_str = "\n".join(exp_list) # Use newline for readability in Excel
-        recent_exp = exp_list[0] if exp_list else "N/A"
+        # Extract recent experience (list of objects to string)
+        exp_list = data.get('experience', [])
+        exp_str = ""
+        if exp_list:
+            first_exp = exp_list[0]
+            exp_str = f"{first_exp.get('title', 'N/A')} at {first_exp.get('company', 'N/A')} ({first_exp.get('duration', 'N/A')})"
         
-        # Flatten education list
-        edu_list = []
-        for edu in profile.get('education', []):
-            edu_list.append(
-                f"{edu.get('degree', 'N/A')} from {edu.get('institution', 'N/A')} ({edu.get('year', 'N/A')})"
-            )
-        edu_str = "\n".join(edu_list)
+        # Extract education (list of objects to string)
+        edu_list = data.get('education', [])
+        edu_str = ""
+        if edu_list:
+            first_edu = edu_list[0]
+            edu_str = f"{first_edu.get('degree', 'N/A')}, {first_edu.get('institution', 'N/A')}"
 
         row = [
-            clean_text(filename),
-            clean_text(profile.get('name', 'N/A')),
-            clean_text(profile.get('email', 'N/A')),
-            clean_text(profile.get('phone', 'N/A')),
-            clean_text(skills_str),
-            clean_text(recent_exp),
-            clean_text(exp_str),
-            clean_text(edu_str),
-            clean_text(profile.get('summary', 'N/A'))
+            data.get('filename', 'N/A'), # Filename we added
+            data.get('name', 'N/A'),
+            data.get('email', 'N/A'),
+            data.get('phone', 'N/A'),
+            data.get('summary', 'N/A'),
+            skills,
+            exp_str,
+            edu_str
         ]
         ws.append(row)
 
-    # Autofit column widths
-    for column in ws.columns:
+    # Autofit columns (simple version)
+    for col in ws.columns:
         max_length = 0
-        column_letter = column[0].column_letter
-        for cell in column:
+        column = col[0].column_letter # Get column letter
+        for cell in col:
             try:
-                # Adjust for multi-line content
-                cell_length = max(len(str(line)) for line in str(cell.value).split('\n'))
-                if cell_length > max_length:
-                    max_length = cell_length
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
             except:
                 pass
-        # Set a reasonable max width
-        adjusted_width = min((max_length + 2) * 1.2, 60)
-        ws.column_dimensions[column_letter].width = max(15, adjusted_width) # Min width of 15
+        adjusted_width = (max_length + 2)
+        ws.column_dimensions[column].width = min(adjusted_width, 60) # Cap width at 60
 
-    # Save to memory
+    # Save to a memory buffer
     memory_file = io.BytesIO()
     wb.save(memory_file)
     memory_file.seek(0)
-    
-    print("Excel file generated in memory with AI data.")
     return memory_file
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        if 'file' not in request.files:
-            # Send a JSON error for the JavaScript 'fetch' to catch
-            return jsonify({"error": "No file part in request."}), 400
+        try:
+            if 'file' not in request.files:
+                return jsonify({"error": "No file part in the request."}), 400
             
-        files = request.files.getlist('file')
+            files = request.files.getlist('file')
+            all_resume_data = []
 
-        if not files or files[0].filename == '':
-            return jsonify({"error": "No file(s) selected."}), 400
+            if not files or all(f.filename == '' for f in files):
+                return jsonify({"error": "No files selected."}), 400
 
-        all_resume_data = []
+            for file in files:
+                if file and (file.filename.endswith('.pdf') or file.filename.endswith('.docx')):
+                    print(f"Processing file: {file.filename}")
+                    text = ""
+                    try:
+                        if file.filename.endswith('.pdf'):
+                            text = extract_text_from_pdf(file.stream)
+                        elif file.filename.endswith('.docx'):
+                            text = extract_text_from_docx(file.stream)
+                        
+                        if text:
+                            ai_data = get_structured_data_from_ai(text)
+                            ai_data['filename'] = file.filename # Add filename for context
+                            all_resume_data.append(ai_data)
+                        
+                    except BaseException as e: # Catch BaseException to stop Gunicorn crashes
+                        print(f"CRITICAL: Failed to process file {file.filename}. Error: {e}")
+                        # Don't stop the whole batch, just skip this file.
+                        all_resume_data.append({"name": f"Error processing {file.filename}", "email": "", "phone": "", "summary": str(e)})
 
-        for file in files:
-            if file and (file.filename.endswith('.pdf') or file.filename.endswith('.docx')):
-                filename = file.filename
-                print(f"Processing file: {filename}")
-                
-                # Catch BaseException to stop SIGKILL crashes from gunicorn
-                try:
-                    if filename.endswith('.pdf'):
-                        text = extract_text_from_pdf(file.stream)
-                    elif filename.endswith('.docx'):
-                        text = extract_text_from_docx(file.stream)
-                    else:
-                        continue 
-                    
-                    profile_data = get_structured_data_from_ai(text)
-                    
-                    all_resume_data.append({
-                        "filename": filename,
-                        "profile": profile_data
-                    })
-                    
-                except BaseException as e:
-                    print(f"CRITICAL ERROR processing file {filename}: {e}")
-                    all_resume_data.append({
-                        "filename": filename,
-                        "profile": {"name": f"Error: Could not read file. It may be corrupt or too complex."}
-                    })
-            else:
-                return jsonify({"error": "Unsupported file format. Please upload .pdf or .docx files only."}), 400
+            if not all_resume_data:
+                 return jsonify({"error": "No valid files were processed."}), 400
 
-        if not all_resume_data:
-             return jsonify({"error": "No valid files were processed."}), 400
-
-        memory_file = generate_excel_in_memory(all_resume_data)
-        
-        # --- NEW LOGIC ---
-        # Instead of sending the file, store it in the cache
-        # and send back a JSON response with a unique ID.
-        
-        # Generate a unique ID for this file
-        download_id = str(uuid.uuid4())
-        
-        # Store the file in our in-memory cache
-        # We'll also store the filename for the download
-        file_cache[download_id] = {
-            "file": memory_file,
-            "filename": "AI_Resumes_Extract.xlsx"
-        }
-        
-        # Send back a JSON response with the download ID
-        return jsonify({"success": True, "download_id": download_id})
+            # --- REVERTED LOGIC ---
+            # Generate the file and send it directly in the response.
+            memory_file = generate_excel_in_memory(all_resume_data)
+            
+            return send_file(
+                memory_file,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                download_name="AI_Resumes_Extract.xlsx",
+                as_attachment=True
+            )
+            # --- END OF REVERTED LOGIC ---
+            
+        except Exception as e:
+            print(f"Error in upload_file: {e}")
+            return jsonify({"error": str(e)}), 500
             
     # For GET requests, just show the HTML page
     return render_template('index.html')
@@ -296,28 +274,10 @@ def upload_file():
 def results_page():
     """
     Renders the download/success page.
-    The file_id is passed as a URL query parameter (?file_id=...)
+    The file data will be retrieved from sessionStorage by the page's JS.
     """
     return render_template('results.html')
 
-@app.route('/download/<download_id>')
-def download_file(download_id):
-    """
-    Serves the generated file from the in-memory cache.
-    """
-    # Use .pop() to get the file AND remove it from the cache.
-    # This ensures the link is one-time use and cleans up memory.
-    file_data = file_cache.pop(download_id, None) 
-    
-    if file_data:
-        return send_file(
-            file_data["file"],
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            download_name=file_data["filename"],
-            as_attachment=True
-        )
-    else:
-        # If file is not found (e.g., expired, bad link), redirect to home
-        # You could also show an error page.
-        return redirect(url_for('upload_file'))
+# --- REMOVED /download/<id> route ---
+# It's no longer needed as the file is sent directly.
 
