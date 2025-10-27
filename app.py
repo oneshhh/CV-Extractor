@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for
+from flask import Flask, render_template, request, send_file, redirect, url_for, jsonify
 import io
 import os
 import pdfplumber
@@ -11,8 +11,7 @@ import json     # To handle the AI's JSON response
 import time     # For exponential backoff
 
 # --- Read API Key from Environment ---
-# This is the FIX for the 403 Error.
-# We will set this GOOGLE_API_KEY in the Render dashboard.
+# This looks for the 'GOOGLE_API_KEY' you set in the Render dashboard.
 API_KEY = os.environ.get('GOOGLE_API_KEY', '')
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={API_KEY}"
 
@@ -221,13 +220,13 @@ def generate_excel_in_memory(all_resume_data):
 def upload_file():
     if request.method == 'POST':
         if 'file' not in request.files:
-            return render_template('index.html', error='No file part')
+            # Send a JSON error for the JavaScript 'fetch' to catch
+            return jsonify({"error": "No file part in request."}), 400
             
-        # Get the list of files from the form
         files = request.files.getlist('file')
 
         if not files or files[0].filename == '':
-            return render_template('index.html', error='No file(s) selected')
+            return jsonify({"error": "No file(s) selected."}), 400
 
         all_resume_data = []
 
@@ -236,9 +235,7 @@ def upload_file():
                 filename = file.filename
                 print(f"Processing file: {filename}")
                 
-                # FIX 2: We changed 'except Exception' to 'except BaseException'.
-                # This will now catch the 'SystemExit' crash and prevent the
-                # whole server from dying, logging it as an error instead.
+                # Catch BaseException to stop SIGKILL crashes from gunicorn
                 try:
                     if filename.endswith('.pdf'):
                         text = extract_text_from_pdf(file.stream)
@@ -247,7 +244,6 @@ def upload_file():
                     else:
                         continue 
                     
-                    # This is the AI step
                     profile_data = get_structured_data_from_ai(text)
                     
                     all_resume_data.append({
@@ -262,13 +258,11 @@ def upload_file():
                         "profile": {"name": f"Error: Could not read file. It may be corrupt or too complex."}
                     })
             else:
-                # This catches any non-pdf/docx files if the browser check fails
-                return render_template('index.html', error='Unsupported file format. Please upload .pdf or .docx files only.')
+                return jsonify({"error": "Unsupported file format. Please upload .pdf or .docx files only."}), 400
 
         if not all_resume_data:
-             return render_template('index.html', error='No valid files were processed.')
+             return jsonify({"error": "No valid files were processed."}), 400
 
-        # Generate the Excel file in memory with all the AI-parsed data
         memory_file = generate_excel_in_memory(all_resume_data)
         
         return send_file(
@@ -278,6 +272,6 @@ def upload_file():
             as_attachment=True
         )
             
-    # For GET requests
+    # For GET requests, just show the HTML page
     return render_template('index.html')
 
