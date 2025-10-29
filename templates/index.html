@@ -183,9 +183,8 @@ display: none; /* Hide by default */
     </div>
 </div>
 
-<!-- --- New JavaScript Logic --- -->
+<!-- *** UPDATED JavaScript Logic (for Async Flow) *** -->
 <script>
-    // Get all the elements we need
     const form = document.getElementById('upload-form');
     const modal = document.getElementById('loader-modal');
     const statusText = document.getElementById('status-text');
@@ -194,22 +193,8 @@ display: none; /* Hide by default */
     const errorBox = document.getElementById('error-message-box');
     const errorText = document.getElementById('error-text');
 
-    // --- Helper function to convert Blob to Base64 ---
-    function blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result.split(',')[1]); // Get just the data part
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    }
-
-    // Listen for the form submission
     form.addEventListener('submit', async function(event) {
-        // Stop the default page reload
         event.preventDefault(); 
-        
-        // Show the modal and reset states
         modal.style.display = 'block';
         uploadButton.disabled = true;
         errorBox.style.display = 'none';
@@ -218,78 +203,40 @@ display: none; /* Hide by default */
         try {
             // Step 1: Uploading
             updateProgress(10, 'Uploading files...');
-            
-            // Get the form data
             const formData = new FormData(form);
 
-            // Use 'fetch' to send the data in the background
             const response = await fetch('/', {
                 method: 'POST',
                 body: formData
             });
 
-            // Step 2: Server is Processing
-            updateProgress(50, 'Server is processing... (This is the long step)');
+            // Step 2: Server received files and queued the job
+            // We are now expecting a JSON response, not a file
+            updateProgress(50, 'Files uploaded. Job is queued...');
 
-            // Check if the server had an error
+            const data = await response.json();
+
             if (!response.ok) {
-                let serverError = `Server error: ${response.status} ${response.statusText}`;
-                try {
-                    // Try to get a JSON error message, as setup in app.py
-                    const errorData = await response.json(); 
-                    serverError = errorData.error || serverError;
-                } catch (e) {
-                    // Server didn't send JSON, maybe a 502/504 gateway error
-                }
-                throw new Error(serverError);
+                throw new Error(data.error || `Server error: ${response.status}`);
             }
 
-            // --- *** NEW LOGIC V2 *** ---
-            // Step 3: Server sent back the file as a Blob
-            updateProgress(90, 'File generated! Saving locally...');
-            
-            // We are now expecting a file/blob, not JSON
-            const blob = await response.blob();
-
-            // Check if the returned file is actually an Excel file
-            if (blob.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-                // It's not an excel file, it's probably a JSON error that slipped through
-                let errorMsg = 'Server did not return an Excel file.';
-                try {
-                    const errText = await blob.text();
-                    const errJson = JSON.parse(errText);
-                    if (errJson.error) {
-                        errorMsg = errJson.error;
-                    }
-                } catch(e) {}
-                throw new Error(errorMsg);
+            if (data.success && data.job_id) {
+                // Step 3: Success! Redirect to the results page
+                updateProgress(100, 'Success! Redirecting to results page...');
+                
+                setTimeout(() => {
+                    // Pass the job_id to the results page via URL
+                    window.location.href = `/results?job_id=${data.job_id}`;
+                }, 500); // 0.5 second delay
+            } else {
+                throw new Error(data.error || 'Server returned an invalid response.');
             }
-
-            // Convert the file blob to a Base64 string to store it
-            const base64Data = await blobToBase64(blob);
-
-            // Store the file data in sessionStorage
-            // This is temporary storage that lasts for the browser tab session
-            sessionStorage.setItem('excelData', base64Data);
-
-            // Step 4: Success! Redirect to the results page
-            updateProgress(100, 'Success! Redirecting...');
-            
-            // We add a short delay so the user can read "Success!"
-            setTimeout(() => {
-                window.location.href = `/results`; // No file_id needed!
-            }, 500); // 0.5 second delay
-            
-            // --- *** END OF NEW LOGIC V2 *** ---
 
         } catch (error) {
             console.error('Upload failed:', error);
-            // Show the error in our error box
             errorText.textContent = error.message;
             errorBox.style.display = 'block';
             modal.style.display = 'none';
-        } finally {
-            // Re-enable the button
             uploadButton.disabled = false;
         }
     });
@@ -299,7 +246,6 @@ display: none; /* Hide by default */
         progressBar.textContent = percent + '%';
         statusText.textContent = text;
     }
-
 </script>
 
 
